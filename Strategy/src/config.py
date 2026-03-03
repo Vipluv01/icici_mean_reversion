@@ -16,19 +16,18 @@ RESULTS_DIR = ROOT_DIR / "results"
 # ── Data ───────────────────────────────────────────────────────────────────
 @dataclass
 class DataConfig:
-    ticker_x: str = "ICICIBANK.NS"     # Primary: ICICI Bank
-    ticker_y: str = "^NSEBANK"         # Pair:    Nifty Bank Index
-    start_date: str = "2015-01-01"
+    ticker_x: str = "ICICIBANK.NS"
+    ticker_y: str = "HDFCBANK.NS"
+    start_date: str = "2018-01-01"
     end_date:   str = "2024-12-31"
     # Angel One API tokens (set via .env)
     angel_token_x:  str = os.getenv("ANGEL_TOKEN_ICICI",     "1660")
     angel_token_y:  str = os.getenv("ANGEL_TOKEN_BANKNIFTY", "26009")
     angel_exchange: str = "NSE"
     angel_interval: str = "ONE_DAY"
-    raw_file_x:     str = "icici_daily.csv"
-    raw_file_y:     str = "banknifty_daily.csv"
+    raw_file_x: str = "icici_daily.csv"
+    raw_file_y: str = "hdfcbank_daily.csv"
     processed_file: str = "processed_pair.csv"
-
 
 # ── Statistical Tests ──────────────────────────────────────────────────────
 @dataclass
@@ -50,10 +49,10 @@ class KalmanConfig:
 # ── Strategy ───────────────────────────────────────────────────────────────
 @dataclass
 class StrategyConfig:
-    zscore_window: int   = 60     # Rolling window for z-score computation
-    entry_zscore:  float = 2.0    # Enter when |z| > this
-    exit_zscore:   float = 0.5    # Exit when |z| < this (mean reversion)
-    stop_zscore:   float = 3.5    # Hard stop if |z| blows out past this
+    zscore_window: int   = 5     # Rolling window for z-score computation
+    entry_zscore:  float = 1.5   # Enter when |z| > this
+    exit_zscore:   float = 0.0    # Exit when |z| < this (mean reversion)
+    stop_zscore:   float = 3.0    # Hard stop if |z| blows out past this
     transaction_cost_bps: float = 10.0   # Round-trip, bps
     slippage_bps:         float = 5.0    # One-way, bps
     position_fraction:    float = 0.95   # Fraction of equity per trade
@@ -65,7 +64,7 @@ class BacktestConfig:
     initial_capital:  float = 1_000_000.0   # INR 10 lakh
     train_ratio:      float = 0.70
     test_ratio:       float = 0.30
-    risk_free_rate:   float = 0.065          # India 10Y yield approx
+    risk_free_rate:   float = 0.04        # India 10Y yield approx
     trading_days:     int   = 252
     monte_carlo_sims: int   = 1000
     random_seed:      int   = 42

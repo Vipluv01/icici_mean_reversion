@@ -45,84 +45,69 @@ class Trade:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_backtest(
-    spread: pd.Series,
-    signals: pd.DataFrame,
-    transaction_costs: pd.Series,
-    cfg: BacktestConfig = backtest_cfg,
+        spread: pd.Series,
+        signals: pd.DataFrame,
+        transaction_costs: pd.Series,
+        cfg: BacktestConfig = backtest_cfg,
 ) -> Tuple[pd.Series, pd.Series, List[Trade]]:
-    """
-    Simulate the strategy on the spread series.
-
-    P&L is computed on the SPREAD directly (already dollar-neutral between
-    ICICI and BankNifty via the Kalman hedge ratio).
-
-    Parameters
-    ----------
-    spread            : pd.Series    Kalman-filtered spread
-    signals           : pd.DataFrame Output of generate_signals()
-    transaction_costs : pd.Series    Output of compute_transaction_costs()
-    cfg               : BacktestConfig
-
-    Returns
-    -------
-    equity_curve : pd.Series   Portfolio value over time
-    returns      : pd.Series   Daily returns
-    trades       : List[Trade] Individual trade records
-    """
     position = signals["position"]
-    spread_ret = spread.pct_change().fillna(0)   # daily spread return
 
-    # Daily strategy return = position * spread_return - transaction_cost_pct
-    tc_pct = transaction_costs / cfg.initial_capital
-    strat_ret = position.shift(1).fillna(0) * spread_ret - tc_pct
-    strat_ret = strat_ret.fillna(0)
+    # Daily P&L = position * daily change in spread (NOT pct_change)
+    spread_diff = spread.diff().fillna(0)
+    transaction_costs = transaction_costs.fillna(0)
+    daily_pnl = position.shift(1).fillna(0) * spread_diff * cfg.initial_capital
 
-    equity_curve = cfg.initial_capital * (1 + strat_ret).cumprod()
+    # Only charge transaction costs on days where position CHANGES
+    position_change = position.diff().fillna(0).abs()
+    daily_pnl = daily_pnl - (transaction_costs * position_change.clip(0, 1))
+
+    # Equity curve
+    equity_curve = cfg.initial_capital + daily_pnl.cumsum()
     equity_curve.name = "equity"
 
-    # ── Extract individual trades ──────────────────────────────────────
+    # Daily returns
+    daily_returns = daily_pnl / cfg.initial_capital
+    daily_returns.name = "returns"
+
+    # Extract trades
     trades: List[Trade] = []
-    pos_arr   = position.values
+    pos_arr = position.values
     spread_arr = spread.values
-    dates     = spread.index
+    dates = spread.index
 
     i = 0
     while i < len(pos_arr):
         if pos_arr[i] != 0:
-            entry_i   = i
-            direction = pos_arr[i]
-            entry_px  = spread_arr[i]
-            # Find exit
+            entry_i = i
+            direction = int(pos_arr[i])
+            entry_px = spread_arr[i]
             j = i + 1
             while j < len(pos_arr) and pos_arr[j] == direction:
                 j += 1
-            exit_i  = min(j, len(spread_arr) - 1)
+            exit_i = min(j, len(spread_arr) - 1)
             exit_px = spread_arr[exit_i]
 
-            raw_pnl = direction * (exit_px - entry_px)
-            cost    = transaction_costs.iloc[i] + (
-                transaction_costs.iloc[exit_i] if exit_i < len(transaction_costs) else 0
-            )
+            raw_pnl = direction * (exit_px - entry_px) * cfg.initial_capital
+            cost = float(transaction_costs.iloc[entry_i])
             net_pnl = raw_pnl - cost
-            entry_notional = abs(entry_px) if abs(entry_px) > 0 else 1.0
 
             trades.append(Trade(
-                entry_date  = dates[entry_i],
-                exit_date   = dates[exit_i],
-                direction   = direction,
-                entry_price = entry_px,
-                exit_price  = exit_px,
-                pnl         = net_pnl,
-                duration    = exit_i - entry_i,
-                pnl_pct     = net_pnl / entry_notional,
+                entry_date=dates[entry_i],
+                exit_date=dates[exit_i],
+                direction=direction,
+                entry_price=entry_px,
+                exit_price=exit_px,
+                pnl=net_pnl,
+                duration=exit_i - entry_i,
+                pnl_pct=net_pnl / cfg.initial_capital,
             ))
             i = j
         else:
             i += 1
 
-    log.info("Backtest complete: %d trades | final equity: %.2f", len(trades), equity_curve.iloc[-1])
-    return equity_curve, strat_ret, trades
-
+    log.info("Backtest complete: %d trades | final equity: %.2f",
+             len(trades), equity_curve.iloc[-1])
+    return equity_curve, daily_returns, trades
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Performance metrics
@@ -148,8 +133,12 @@ def compute_metrics(
     -------
     dict  All metrics keyed by name
     """
-    ret = returns.dropna()
-    n_years = len(ret) / cfg.trading_days
+    # Only use days where we are in a position for Sharpe calculation
+    # n_years based on full calendar period (not just active days)
+    n_years = len(returns.dropna()) / cfg.trading_days
+    # Only active days for Sharpe/Sortino calculation
+    active_mask = returns != 0
+    ret = returns[active_mask].dropna()
 
     # ── Return metrics ─────────────────────────────────────────────────
     total_return  = (equity_curve.iloc[-1] / equity_curve.iloc[0]) - 1

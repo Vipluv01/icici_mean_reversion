@@ -343,7 +343,7 @@ def load_pair_data(
 
         # ── Clean & save ──────────────────────────────────────────────────
         df_x = clean_ohlcv(df_x, label="ICICI")
-        df_y = clean_ohlcv(df_y, label="BankNifty")
+        df_y = clean_ohlcv(df_y, label="HDFCBank")
         df_x.to_csv(path_x)
         df_y.to_csv(path_y)
         log.info("Data saved to %s and %s", path_x, path_y)

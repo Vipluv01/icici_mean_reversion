@@ -20,21 +20,39 @@ bt = pd.read_pickle(RESULTS_DIR / "03_backtest_results.pkl")
 df = load_processed()
 y, x = df["icici_close"], df["banknifty_close"]
 
-def pipeline(y_s, x_s, **kw):
-    cfg = replace(strategy_cfg, **kw)
-    hr, ic, sp = kalman_hedge_ratio(y_s, x_s, kalman_cfg.observation_covariance, kalman_cfg.transition_covariance)
-    zs = compute_zscore(sp, cfg.zscore_window)
-    sg = generate_signals(zs, cfg)
-    eq0 = pd.Series(backtest_cfg.initial_capital, index=sp.index)
-    ps = compute_position_sizes(sg, eq0, cfg)
-    tc = compute_transaction_costs(ps, cfg)
-    eq, ret, trd = run_backtest(sp, sg, tc, backtest_cfg)
-    return compute_metrics(eq, ret, trd, backtest_cfg) if trd else None
+
 
 # Walk-forward split
-n = len(y); split = int(n * backtest_cfg.train_ratio)
-m_is  = pipeline(y.iloc[:split], x.iloc[:split])
-m_oos = pipeline(y.iloc[split:], x.iloc[split:])
+# Use full spread and signals from notebook 03 — split by index
+spread  = bt["spread"]
+signals = bt["signals"]
+
+n     = len(spread)
+split = int(n * backtest_cfg.train_ratio)
+
+print(f"IS : {spread.index[0].date()} to {spread.index[split-1].date()}")
+print(f"OOS: {spread.index[split].date()} to {spread.index[-1].date()}")
+
+def run_period(sp, sg):
+    eq0 = pd.Series(backtest_cfg.initial_capital, index=sp.index)
+    ps  = compute_position_sizes(sg, eq0, strategy_cfg)
+    tc  = compute_transaction_costs(ps, strategy_cfg)
+    eq, ret, trd = run_backtest(sp, sg, tc, backtest_cfg)
+    if not trd:
+        return None
+    return compute_metrics(eq, ret, trd, backtest_cfg)
+
+m_is  = run_period(spread.iloc[:split], signals.iloc[:split])
+m_oos = run_period(spread.iloc[split:], signals.iloc[split:])
+
+print("\nWALK-FORWARD RESULTS")
+if m_is and m_oos:
+    for k in ["sharpe_ratio", "annualized_return", "max_drawdown",
+              "calmar_ratio", "win_rate", "total_trades"]:
+        print(f"  {k:<26} IS={m_is[k]:.4f}  OOS={m_oos[k]:.4f}")
+    ratio = m_oos["sharpe_ratio"] / m_is["sharpe_ratio"]
+    print(f"  OOS/IS Sharpe: {ratio:.4f}  "
+          f"({'PASS' if ratio >= validation_cfg.oos_sharpe_min_ratio else 'FAIL'})")
 
 print("WALK-FORWARD RESULTS")
 if m_is and m_oos:
@@ -70,19 +88,37 @@ axes[1].set_title("MC: Max Drawdown Distribution"); axes[1].legend()
 plt.tight_layout(); plt.savefig(RESULTS_DIR/"04_monte_carlo.png", bbox_inches="tight")
 
 # Sensitivity
-entries=[round(strategy_cfg.entry_zscore*(1+d),2) for d in [-0.2,-0.1,0,0.1,0.2]]
-windows=[int(strategy_cfg.zscore_window*(1+d)) for d in [-0.2,-0.1,0,0.1,0.2]]
-grid=np.full((len(entries),len(windows)),np.nan)
-for i,e in enumerate(entries):
-    for j,w in enumerate(windows):
-        m=pipeline(y,x,entry_zscore=e,zscore_window=w)
-        if m: grid[i,j]=m["sharpe_ratio"]
+# Parameter sensitivity using pre-computed signals
+entries = [round(strategy_cfg.entry_zscore*(1+d), 2) for d in [-0.2, -0.1, 0, 0.1, 0.2]]
+windows = [int(strategy_cfg.zscore_window*(1+d))    for d in [-0.2, -0.1, 0, 0.1, 0.2]]
+grid    = np.full((len(entries), len(windows)), np.nan)
 
-fig,ax=plt.subplots(figsize=(10,6))
-sns.heatmap(grid,annot=True,fmt=".2f",xticklabels=[f"{w}d" for w in windows],
-    yticklabels=[f"{e}s" for e in entries],cmap="RdYlGn",center=threshold_cfg.min_sharpe,ax=ax,linewidths=0.5)
+for i, e in enumerate(entries):
+    for j, w in enumerate(windows):
+        try:
+            zs_test = compute_zscore(spread, window=w)
+            from dataclasses import replace as dc_replace
+            cfg_test = dc_replace(strategy_cfg, entry_zscore=e, zscore_window=w)
+            sg_test  = generate_signals(zs_test, cfg_test)
+            eq0      = pd.Series(backtest_cfg.initial_capital, index=spread.index)
+            ps_test  = compute_position_sizes(sg_test, eq0, cfg_test)
+            tc_test  = compute_transaction_costs(ps_test, cfg_test)
+            eq_t, ret_t, trd_t = run_backtest(spread, sg_test, tc_test, backtest_cfg)
+            if trd_t:
+                m_t = compute_metrics(eq_t, ret_t, trd_t, backtest_cfg)
+                grid[i, j] = m_t["sharpe_ratio"]
+        except Exception:
+            pass
+
+fig, ax = plt.subplots(figsize=(10, 6))
+sns.heatmap(grid, annot=True, fmt=".2f",
+            xticklabels=[f"{w}d" for w in windows],
+            yticklabels=[f"{e}s" for e in entries],
+            cmap="RdYlGn", center=threshold_cfg.min_sharpe,
+            ax=ax, linewidths=0.5)
 ax.set_title("Sharpe Sensitivity: Entry Z-Score vs Window")
-plt.tight_layout(); plt.savefig(RESULTS_DIR/"04_sensitivity.png", bbox_inches="tight")
+plt.tight_layout()
+plt.savefig(RESULTS_DIR / "04_sensitivity.png", bbox_inches="tight")
 
 # Regime analysis
 log_ret=df["icici_ret"].dropna()
