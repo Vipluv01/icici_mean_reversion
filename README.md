@@ -1,6 +1,20 @@
-# ICICI Bank Futures — Mean Reversion Strategy
+# ICICI Bank Futures — Mean Reversion Strategy By Vipluv Sultania
 
-A statistically grounded pairs trading strategy on ICICI Bank vs HDFC Bank (NSE) using daily data from 2018-2024. Built as part of the trade360.ai Round 1 Quantitative Developer Assessment.
+This is mean reversion strategy built by Vipluv Sultania on ICICI Bank.
+
+A statistically grounded pairs trading strategy on ICICI Bank vs HDFC Bank (NSE) using daily data from 2018-2024. 
+
+## Development Notes
+
+A few things I learned building this:
+
+**Pair selection was harder than expected.** I initially tried ICICI Bank vs Nifty Bank Index but Engle-Granger gave p=0.63 — no cointegration at all. Switching to HDFC Bank as the pair worked much better (p=0.0242) because they are direct competitors rather than one being a component of the other.
+
+**Date range matters a lot.** Testing from 2015 gave cointegration failures — likely due to structural breaks from IL&FS crisis and COVID. Starting from 2018 captures a cleaner regime where both banks operate comparably.
+
+**Kalman Filter over rolling OLS.** Rolling OLS hedge ratio was too noisy on short windows and too slow to adapt on long windows. Kalman Filter naturally handles this with the transition covariance parameter.
+
+**Half-life of 1.2 days was surprising.** I expected something like 5-10 days for daily data but the spread between these two liquid large-caps reverts extremely fast — institutional arbitrageurs keep it tight.
 
 ## Strategy Overview
 
@@ -136,3 +150,4 @@ All random seeds are fixed at 42. Results are fully deterministic given the same
 ## License
 
 Private repository — not for redistribution.
+Owned By Vipluv Sultania
