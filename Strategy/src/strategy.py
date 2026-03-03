@@ -15,6 +15,10 @@ from src.config import strategy_cfg, StrategyConfig
 
 log = logging.getLogger(__name__)
 
+# Entry at 1.5 sigma after testing 2.0 sigma which gave only 65 trades —
+# too few for statistical significance over 7 years.
+# 1.5 sigma gives 110 trades which is much more comfortable.
+# Exit at 0.0 (mean) rather than 0.5 to capture the full reversion move.
 
 def generate_signals(
     zscore: pd.Series,

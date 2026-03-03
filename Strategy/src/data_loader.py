@@ -53,6 +53,9 @@ log = logging.getLogger(__name__)
 # 1.  yfinance loader  (primary, no credentials needed)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Tried Angel One API first but yfinance is more reliable for daily data.
+# Angel One is kept as fallback in case Yahoo Finance changes their API.
+
 def fetch_yfinance(
     ticker: str,
     start: str,

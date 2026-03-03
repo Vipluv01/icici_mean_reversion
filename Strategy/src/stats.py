@@ -174,6 +174,12 @@ def run_johansen(
     }
 
 
+# NOTE: I initially tried rolling OLS for the hedge ratio but the results
+# were too noisy — beta was jumping around too much on a 60-day window.
+# Switched to Kalman Filter which gives much smoother, adaptive estimates.
+# Took a while to tune the transition_covariance — 0.01 works well here,
+# higher values made it overfit to noise.
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 4.  Kalman Filter  — Dynamic Hedge Ratio
 # ══════════════════════════════════════════════════════════════════════════════

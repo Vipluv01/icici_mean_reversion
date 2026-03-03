@@ -44,6 +44,11 @@ class Trade:
 # Core backtest loop
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Initial version used pct_change() on spread which caused crazy compounding.
+# Switched to spread.diff() * initial_capital for dollar P&L instead.
+# Much more sensible and matches how pairs trading actually works.
+
+
 def run_backtest(
         spread: pd.Series,
         signals: pd.DataFrame,
