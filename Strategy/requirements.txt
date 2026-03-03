@@ -1,0 +1,32 @@
+# ============================================================
+# ICICI Bank Futures Mean Reversion Strategy
+# Requirements — install with: pip install -r requirements.txt
+# ============================================================
+
+# Core data & numerics
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+
+# Statistical tests
+statsmodels>=0.14.0
+
+# Kalman Filter
+pykalman>=0.9.7
+
+# Data fetching
+yfinance>=0.2.36
+requests>=2.31.0
+pyotp>=2.9.0
+
+# Visualisation
+matplotlib>=3.7.0
+seaborn>=0.13.0
+
+# Notebook support
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
