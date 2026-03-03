@@ -49,7 +49,4 @@ print("  Issue: Not capturing full mean reversion")
 print("  Decision: Exit at 0.0 sigma")
 
 print("\nAll experiments documented. Final parameters in src/config.py")
-```
-
----
 
