@@ -53,10 +53,3 @@ print("\nAll experiments documented. Final parameters in src/config.py")
 
 ---
 
-**4. Fix the git history**
-
-In GitHub Desktop, make **separate small commits** for each change:
-```
-Commit 1: "Add personal notes to README — pair selection learnings"
-Commit 2: "Add code comments explaining design decisions"
-Commit 3: "Add experiments notebook with failed attempts"
